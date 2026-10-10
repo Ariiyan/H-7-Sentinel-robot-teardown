@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>H-7 Sentinel — scroll teardown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Figtree:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0c1018;--ink:#e8edf7;--muted:#8d98b3;--amber:#ffb02e;--cyan:#37e6ff;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root:not([data-theme="light"]){color-scheme:dark}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,sans-serif;font-size:1.05rem;line-height:1.55}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+#bar{position:fixed;left:0;top:0;height:3px;width:100%;background:var(--amber);transform-origin:0 50%;transform:scaleX(0);z-index:5}
+#hud{position:fixed;right:1.2rem;top:calc(1rem + env(safe-area-inset-top,0px));z-index:4;text-align:right;font-family:'Chakra Petch',sans-serif;font-size:.95rem}
+#hud b{display:block;font-size:1.9rem;color:var(--amber);line-height:1}
+#hud span{color:var(--muted)}
+#brand{position:fixed;left:1.2rem;top:calc(1rem + env(safe-area-inset-top,0px));z-index:4;font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:1.05rem}
+#labels{position:fixed;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.lb{position:absolute;left:0;top:0;padding-left:.8rem;border-left:1px solid var(--cyan);font-family:'Chakra Petch',sans-serif;font-size:.9rem;line-height:1.25;opacity:0;white-space:nowrap}
+.lb::before{content:"";position:absolute;left:-4px;top:-3px;width:7px;height:7px;border-radius:50%;background:var(--cyan)}
+.lb small{display:block;color:var(--muted);font-family:Figtree,sans-serif;font-size:.78rem}
+main{position:relative;z-index:2}
+section{min-height:100vh;min-height:100svh;display:flex;align-items:center;padding:6rem 1.5rem}
+.panel{max-width:27rem;opacity:var(--o,0);transform:translateX(calc((1 - var(--o,0)) * -30px))}
+h1,h2{font-family:'Chakra Petch',sans-serif;font-weight:700;line-height:1.02;margin:0 0 1rem}
+h1{font-size:clamp(3rem,10vw,6.5rem)}
+h2{font-size:clamp(2rem,5.5vw,3.6rem)}
+p{margin:0 0 1.2rem;color:var(--muted);max-width:32em}
+dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1.4rem;margin:0;font-size:.95rem}
+dt{color:var(--muted)}dd{margin:0;font-family:'Chakra Petch',sans-serif;color:var(--ink)}
+.hint{display:flex;gap:.7rem;align-items:center;font-weight:500}
+.hint i{width:1.5px;height:2.4rem;background:linear-gradient(var(--cyan),transparent);animation:d 1.8s ease-in-out infinite;transform-origin:top}
+@keyframes d{0%{transform:scaleY(0)}60%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
+@media(max-width:700px){section{align-items:flex-end;padding-bottom:3.5rem}.panel{background:linear-gradient(transparent,rgba(12,16,24,.85) 30%);padding-top:2rem}.lb{font-size:.78rem}}
+@media(prefers-reduced-motion:reduce){.hint i{animation:none}}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="brand">H-7 SENTINEL</div>
+<div id="hud"><b id="hp">0%</b><span id="hs">Assembled</span></div>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div id="labels"></div>
+<main>
+  <section><div class="panel"><h1>H-7 Sentinel</h1><p>A bipedal inspection robot. Scroll to take it apart, one assembly at a time.</p><div class="hint"><i></i>Scroll to disassemble</div></div></section>
+  <section><div class="panel"><h2>21 assemblies, one frame.</h2><p>Every plate, joint and actuator separates along its own axis so you can see how the unit is put together.</p></div></section>
+  <section><div class="panel"><h2>Sensor head</h2><p>Stereo cameras and a lidar mast feed a single perception board.</p><dl><dt>Vision</dt><dd>2 × 12 MP</dd><dt>Range</dt><dd>40 m lidar</dd><dt>Mass</dt><dd>4.2 kg</dd></dl></div></section>
+  <section><div class="panel"><h2>Power core</h2><p>The armor goes translucent so the fusion cell at the centre is visible behind the chest plates.</p><dl><dt>Capacity</dt><dd>3.2 kWh</dd><dt>Peak load</dt><dd>40 min</dd><dt>Armor</dt><dd>6 mm composite</dd></dl></div></section>
+  <section><div class="panel"><h2>Leg actuators</h2><p>Hip, knee and ankle joints use the same drive module, which keeps servicing simple.</p><dl><dt>Hip torque</dt><dd>240 N·m</dd><dt>Knee travel</dt><dd>±130°</dd><dt>Modules</dt><dd>6 identical</dd></dl></div></section>
+  <section><div class="panel"><h2>Back together.</h2><p>Scroll back up to run the teardown again, or keep going to reassemble.</p></div></section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var canvas=document.getElementById('gl'),bar=document.getElementById('bar');
+  var hp=document.getElementById('hp'),hs=document.getElementById('hs'),lbBox=document.getElementById('labels');
+  var panels=[].slice.call(document.querySelectorAll('.panel'));
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var STAGES=['Assembled','Exploded view','Sensor head','Power core','Leg actuators','Reassembled'];
+
+  function updatePanels(){
+    var vh=innerHeight;
+    panels.forEach(function(el){
+      var r=el.getBoundingClientRect(),c=(r.top+r.height/2)/vh;
+      var o=1-Math.min(1,Math.abs(c-.5)*2.2);
+      el.style.setProperty('--o',reduce?1:Math.max(0,Math.min(1,o*1.6)).toFixed(3));
+    });
+  }
+  var renderer;
+  try{renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});}
+  catch(e){updatePanels();addEventListener('scroll',updatePanels,{passive:true});return;}
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  var scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x0c1018);
+  scene.fog=new THREE.Fog(0x0c1018,12,30);
+  var camera=new THREE.PerspectiveCamera(45,1,.1,80);
+  scene.add(new THREE.HemisphereLight(0x9fb4ff,0x1a1f2e,.9));
+  var sun=new THREE.DirectionalLight(0xffffff,1.1);sun.position.set(4,8,6);scene.add(sun);
+  var rim=new THREE.PointLight(0xffb02e,1.4,20);rim.position.set(-5,2,-4);scene.add(rim);
+  var corelight=new THREE.PointLight(0x37e6ff,1.6,9);scene.add(corelight);
+
+  var floor=new THREE.GridHelper(40,40,0x37e6ff,0x24304a);floor.position.y=-3.8;scene.add(floor);
+  var root=new THREE.Group();scene.add(root);
+
+  /* ---------- builders ---------- */
+  var SHELL=0x2b3248,SHELL2=0x434d6e,AMBER=0xffb02e,CYAN=0x37e6ff;
+  function reg(g,m,base){m.transparent=true;m.userData.base=base;m.opacity=base;g.userData.mats.push(m);}
+  function box(g,w,h,d,x,y,z,col,glow){
+    var geo=new THREE.BoxGeometry(w,h,d);
+    var m=glow?new THREE.MeshBasicMaterial({color:col}):new THREE.MeshStandardMaterial({color:col,metalness:.55,roughness:.4});
+    var me=new THREE.Mesh(geo,m);me.position.set(x,y,z);g.add(me);reg(g,m,1);
+    if(!glow){var lm=new THREE.LineBasicMaterial({color:0x7d8cbc});
+      var ln=new THREE.LineSegments(new THREE.EdgesGeometry(geo),lm);ln.position.copy(me.position);g.add(ln);reg(g,lm,.7);}
+  }
+  function cyl(g,r,h,x,y,z,col,rz,glow){
+    var geo=new THREE.CylinderGeometry(r,r,h,20);
+    var m=glow?new THREE.MeshBasicMaterial({color:col}):new THREE.MeshStandardMaterial({color:col,metalness:.6,roughness:.35});
+    var me=new THREE.Mesh(geo,m);me.position.set(x,y,z);me.rotation.z=rz||0;g.add(me);reg(g,m,1);
+  }
+  function ball(g,r,x,y,z,col,glow){
+    var m=glow?new THREE.MeshBasicMaterial({color:col}):new THREE.MeshStandardMaterial({color:col,metalness:.6,roughness:.35});
+    var me=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);me.position.set(x,y,z);g.add(me);reg(g,m,1);
+  }
+
+  var parts=[],byName={};
+  function part(name,tag,home,off,build){
+    var g=new THREE.Group();g.userData.mats=[];build(g);
+    g.position.set(home[0],home[1],home[2]);root.add(g);
+    var p={name:name,tag:tag,g:g,home:home,off:off};parts.push(p);byName[name]=p;
+  }
+  part('head','head',[0,3,0],[0,1.4,0],function(g){
+    box(g,1,.8,.9,0,0,0,SHELL2);box(g,.8,.22,.06,0,.03,.47,CYAN,true);
+    cyl(g,.035,.55,.3,.62,0,AMBER);ball(g,.07,.3,.92,0,AMBER,true);
+    box(g,.1,.3,.4,.55,0,0,SHELL);box(g,.1,.3,.4,-.55,0,0,SHELL);
+  });
+  part('neck','torso',[0,2.5,0],[0,.85,0],function(g){cyl(g,.25,.4,0,0,0,SHELL);cyl(g,.3,.08,0,.2,0,AMBER);});
+  part('chestF','torso',[0,1.8,.45],[0,.3,1.8],function(g){box(g,1.5,1.2,.3,0,0,0,SHELL2);box(g,.6,.08,.05,0,.3,.17,AMBER,true);box(g,.6,.08,.05,0,.1,.17,AMBER,true);});
+  part('chestB','torso',[0,1.8,-.45],[0,.3,-1.8],function(g){box(g,1.5,1.2,.3,0,0,0,SHELL2);box(g,1,.1,.05,0,0,-.17,SHELL);});
+  part('core','core',[0,1.8,0],[0,.3,0],function(g){
+    ball(g,.38,0,0,0,CYAN,true);cyl(g,.55,.06,0,0,0,AMBER);cyl(g,.15,1,0,0,0,SHELL);
+  });
+  part('pack','torso',[0,1.9,-.95],[0,.5,-2.9],function(g){
+    box(g,.9,1,.4,0,0,0,SHELL);cyl(g,.14,.5,.25,-.7,0,SHELL2);cyl(g,.14,.5,-.25,-.7,0,SHELL2);
+    ball(g,.08,.25,-.98,0,CYAN,true);ball(g,.08,-.25,-.98,0,CYAN,true);
+  });
+  part('pelvis','legs',[0,.8,0],[0,-.5,0],function(g){box(g,1.1,.5,.7,0,0,0,SHELL2);cyl(g,.22,.4,.4,-.3,0,SHELL,1.57);cyl(g,.22,.4,-.4,-.3,0,SHELL,1.57);});
+  [-1,1].forEach(function(s){
+    var n=s<0?'L':'R';
+    part('shoulder'+n,'arms',[s*1,2.4,0],[s*1.1,.7,0],function(g){ball(g,.38,0,0,0,SHELL2);box(g,.5,.14,.5,0,.3,0,AMBER);});
+    part('upperArm'+n,'arms',[s*1.25,1.7,0],[s*2,.3,0],function(g){box(g,.38,.9,.38,0,0,0,SHELL);cyl(g,.22,.4,0,-.45,0,SHELL2,1.57);});
+    part('forearm'+n,'arms',[s*1.25,.8,0],[s*2.5,-.5,0],function(g){box(g,.44,.8,.44,0,0,0,SHELL2);box(g,.46,.08,.46,0,.2,0,AMBER,true);});
+    part('hand'+n,'arms',[s*1.25,.15,0],[s*2.9,-1.3,0],function(g){box(g,.4,.35,.3,0,0,0,SHELL);for(var k=-1;k<2;k++)box(g,.08,.25,.08,k*.12,-.28,.04,SHELL2);});
+    part('thigh'+n,'legs',[s*.4,-.1,0],[s*1.1,-.9,0],function(g){box(g,.5,1,.5,0,0,0,SHELL2);cyl(g,.3,.55,0,-.55,0,SHELL,1.57);box(g,.52,.08,.52,0,.3,0,AMBER,true);});
+    part('shin'+n,'legs',[s*.4,-1.3,0],[s*1.5,-2,0],function(g){box(g,.5,1,.55,0,0,0,SHELL);box(g,.2,.7,.06,0,0,.3,AMBER,true);});
+    part('foot'+n,'legs',[s*.4,-2.1,.15],[s*1.8,-3,.4],function(g){box(g,.55,.25,.95,0,0,0,SHELL2);box(g,.5,.08,.2,0,.13,.4,AMBER);});
+  });
+  hs.textContent=STAGES[0];
+
+  /* ---------- timeline ---------- */
+  var V=THREE.Vector3;
+  var camP=[new V(0,1,8),new V(6,2.5,9),new V(2.2,4.8,4.2),new V(-3.5,2.2,5),new V(3.5,-1.5,6),new V(0,1.2,10)];
+  var camT=[new V(0,.6,0),new V(0,.8,0),new V(0,4.4,0),new V(0,1.9,0),new V(0,-2.2,0),new V(0,.6,0)];
+  var E=[0,1,1,1,1,0],YAW=[-.5,.4,0,-.4,.3,0];
+  var OP={head:[1,1,1,.18,.18,1],torso:[1,1,.18,.3,.18,1],core:[1,1,.3,1,.3,1],arms:[1,1,.18,.18,.18,1],legs:[1,1,.18,.18,1,1]};
+
+  var labels=[
+    {s:1,p:'chestF',t:'Chassis plate',d:'21 assemblies'},
+    {s:2,p:'head',t:'Stereo vision array',d:'2 × 12 MP · 110° field',o:[.5,.1,.5]},
+    {s:2,p:'head',t:'Lidar mast',d:'40 m range',o:[.3,.9,0]},
+    {s:3,p:'core',t:'Fusion cell',d:'3.2 kWh'},
+    {s:3,p:'chestF',t:'Armor plate',d:'6 mm composite',o:[.6,.4,0]},
+    {s:4,p:'thighR',t:'Hip actuator',d:'240 N·m torque'},
+    {s:4,p:'shinR',t:'Knee linkage',d:'±130° travel'}
+  ];
+  labels.forEach(function(l){
+    var el=document.createElement('div');el.className='lb';
+    el.innerHTML=l.t+'<small>'+l.d+'</small>';lbBox.appendChild(el);l.el=el;
+  });
+
+  function resize(){
+    var w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);
+    camera.aspect=w/h;camera.fov=w<700?62:45;camera.updateProjectionMatrix();
+  }
+  resize();addEventListener('resize',resize);
+
+  var target=0,prog=0,mx=0,my=0;
+  function readScroll(){
+    var max=document.documentElement.scrollHeight-innerHeight;
+    target=max>0?scrollY/max:0;bar.style.transform='scaleX('+target+')';updatePanels();
+  }
+  addEventListener('scroll',readScroll,{passive:true});readScroll();
+  addEventListener('pointermove',function(e){mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5;});
+
+  var clock=new THREE.Clock(),tmp=new V(),look=new V();
+  function ss(x){return x*x*(3-2*x);}
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt=clock.getDelta(),el=clock.elapsedTime,idle=reduce?0:1;
+    prog+=(target-prog)*(reduce?1:Math.min(1,dt*4.5));
+    var f=Math.min(prog,.9999)*5,i=Math.floor(f),t=ss(f-i);
+    function L(a){return a[i]+(a[i+1]-a[i])*t;}
+
+    camera.position.copy(camP[i]).lerp(camP[i+1],t);
+    camera.position.x+=mx*.8*idle;camera.position.y-=my*.5*idle;
+    look.copy(camT[i]).lerp(camT[i+1],t);camera.lookAt(look);
+
+    var e=L(E);
+    root.rotation.y=L(YAW)+Math.sin(el*.4)*.08*idle;
+    parts.forEach(function(p,k){
+      var fl=Math.sin(el*1.3+k)*.06*e*idle;
+      p.g.position.set(p.home[0]+p.off[0]*e,p.home[1]+p.off[1]*e+fl,p.home[2]+p.off[2]*e);
+      var op=L(OP[p.tag]);
+      p.g.userData.mats.forEach(function(m){m.opacity=m.userData.base*op;});
+    });
+    var core=byName.core.g;core.rotation.y=el*.8*idle;
+    core.scale.setScalar(1+Math.sin(el*3)*.06*idle);
+    core.getWorldPosition(tmp);corelight.position.copy(tmp);
+
+    /* labels */
+    labels.forEach(function(l){
+      var a=Math.max(0,1-Math.abs(f-l.s)*2.4);
+      l.el.style.opacity=a.toFixed(2);
+      if(a<=0)return;
+      byName[l.p].g.getWorldPosition(tmp);
+      if(l.o)tmp.add(new V(l.o[0],l.o[1],l.o[2]));
+      tmp.project(camera);
+      l.el.style.transform='translate('+((tmp.x*.5+.5)*innerWidth+30).toFixed(0)+'px,'+((-tmp.y*.5+.5)*innerHeight).toFixed(0)+'px)';
+    });
+    hp.textContent=Math.round(e*100)+'%';
+    hs.textContent=STAGES[Math.round(f)];
+    renderer.render(scene,camera);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>
